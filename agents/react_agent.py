@@ -197,6 +197,19 @@ class ReactAgent:
         self._log_message("user", user_request)
         
         try:
+            # PLANNING PHASE: First understand and plan the request
+            if not self.context.get("planning_completed", False):
+                planning_result = self._create_implementation_plan()
+                if planning_result.get("success"):
+                    self.context["implementation_plan"] = planning_result["plan"]
+                    self.context["planning_completed"] = True
+                    self._log_message("agent", f"Created implementation plan: {planning_result['plan']['summary']}")
+                else:
+                    return {
+                        "success": False,
+                        "error": f"Planning failed: {planning_result.get('error', 'Unknown error')}"
+                    }
+            
             # REACT Loop
             while (self.iterations_completed < self.max_iterations and 
                    self.llm_calls_made < self.max_llm_calls and 
@@ -252,9 +265,23 @@ class ReactAgent:
         if not self.client or self.llm_calls_made >= self.max_llm_calls:
             return {"action": "generate_final_html", "reasoning": "LLM calls exhausted"}
         
-        # Build reasoning prompt
+        # Build reasoning prompt with implementation plan
+        implementation_plan = self.context.get('implementation_plan', {})
+        plan_summary = implementation_plan.get('summary', 'No plan available')
+        research_tasks = implementation_plan.get('research_tasks', [])
+        data_requirements = implementation_plan.get('data_requirements', [])
+        
         system_prompt = f"""
-        You are a REACT agent specialized in disaster response applications. Your MANDATORY first step is to research and gather intelligence before generating any HTML.
+        You are a REACT agent executing a planned disaster response application implementation.
+        
+        IMPLEMENTATION PLAN:
+        {plan_summary}
+        
+        DATA REQUIREMENTS:
+        {chr(10).join('- ' + req for req in data_requirements) if data_requirements else '- No specific requirements identified'}
+        
+        RESEARCH TASKS TO COMPLETE:
+        {chr(10).join('- ' + task for task in research_tasks) if research_tasks else '- No specific research tasks identified'}
         
         Current task: {self.context['user_request']}
         
@@ -265,30 +292,29 @@ class ReactAgent:
         
         {self.context['available_templates']}
         
-        🚨 CRITICAL REQUIREMENTS:
-        - You MUST use tools to gather current information before generating HTML
-        - You MUST prioritize configured data sources over external alternatives  
-        - You MUST validate data sources and APIs to get working endpoints
-        - You MUST fetch sample data to understand the data structure
-        - NEVER generate HTML without first using at least 2-3 different tools
-        - The quality of your final application depends on the intelligence you gather
+        🎯 PLAN-DRIVEN APPROACH:
+        - Follow the implementation plan to guide your research
+        - Complete the specific research tasks identified in the plan
+        - Gather the data sources specified in the data requirements
+        - Validate that you can fulfill the planned functional requirements
+        - ONLY generate HTML once you have completed the planned research
         
-        📋 DATA SOURCE PRIORITY ORDER:
-        1. FIRST: Use 'fetch_stac_sample_data' with configured collections
-        2. SECOND: Use 'validate_api_endpoint' on configured source URLs
-        3. THIRD: Only if needed, use 'web_search' for supplementary context
+        📋 RESEARCH PRIORITY (based on plan):
+        1. FIRST: Complete research tasks from implementation plan
+        2. SECOND: Validate data requirements can be met with available sources
+        3. THIRD: Gather any supplementary information needed
         
         ONLY decide to "generate_final_html" if you have:
-        1. Current news/events about the topic
-        2. Validated working API endpoints  
-        3. Sample data showing the actual structure
-        4. At least 3 successful tool calls completed
+        1. Completed the research tasks from your implementation plan
+        2. Validated that data requirements can be satisfied
+        3. At least 3 successful tool calls completed
+        4. Confidence that the plan can be executed with gathered intelligence
         
         Return a JSON object with:
-        - "reasoning": Your detailed thought process
+        - "reasoning": Your detailed thought process (reference the implementation plan)
         - "action": Tool name to use (web_search, validate_api_endpoint, fetch_stac_sample_data, etc.)
         - "parameters": Parameters for the tool
-        - "continue": true (always true until you have gathered sufficient intelligence)
+        - "continue": true (always true until plan research is complete)
         """
         
         # Include previous context
@@ -298,13 +324,15 @@ class ReactAgent:
         Context so far:
         {context_summary}
         
-        What should I do next to gather information for: {self.context['user_request']}?
+        Based on the implementation plan, what should I do next to complete the research phase?
         
-        Consider:
-        1. Do I need current news/events about this topic?
-        2. Should I validate any data sources or APIs?
-        3. Should I fetch sample data from relevant collections?
-        4. Do I have enough information to generate a comprehensive application?
+        Review the implementation plan and consider:
+        1. Which research tasks from the plan have I completed?
+        2. Which data requirements do I still need to validate?
+        3. What specific information is still missing to execute the plan?
+        4. Am I ready to generate the application based on the plan and gathered intelligence?
+        
+        Focus on completing the planned research systematically rather than random exploration.
         
         Respond with valid JSON only.
         """
@@ -396,6 +424,16 @@ class ReactAgent:
             }
         
         try:
+            # Validate parameters format
+            if not isinstance(parameters, dict):
+                logger.error(f"Tool {tool_name} received non-dict parameters: {type(parameters)} - {parameters}")
+                return {
+                    "success": False,
+                    "error": f"Invalid parameters format: expected dict, got {type(parameters).__name__}",
+                    "tool": tool_name,
+                    "raw_parameters": str(parameters)
+                }
+            
             result = tool.execute(**parameters)
             self._log_message("tool", f"Executed {tool_name}", {"parameters": parameters, "result": result})
             return result
@@ -452,6 +490,112 @@ class ReactAgent:
         
         return "\n".join(descriptions)
     
+    def _create_implementation_plan(self) -> Dict[str, Any]:
+        """
+        Create a detailed implementation plan based on the user request
+        """
+        if not self.client or self.llm_calls_made >= self.max_llm_calls:
+            return {
+                "success": False,
+                "error": "OpenAI client not available or LLM calls exhausted"
+            }
+        
+        system_prompt = f"""
+        You are an expert disaster response application planner. Your job is to analyze user requests and create detailed implementation plans.
+
+        {self.context['available_data_sources']}
+
+        PLANNING REQUIREMENTS:
+        1. Parse the user request to understand exactly what they want
+        2. Define specific functional requirements 
+        3. Identify what data sources and APIs are needed
+        4. Plan the user interface and interaction design
+        5. Outline the technical implementation approach
+
+        Create a comprehensive plan that will guide the research and implementation phases.
+        
+        Return ONLY a valid JSON object with this structure:
+        {{
+          "summary": "Brief summary of what will be built",
+          "user_intent": "Clear interpretation of what the user wants",
+          "functional_requirements": [
+            "Specific requirement 1",
+            "Specific requirement 2"
+          ],
+          "data_requirements": [
+            "Data source 1 needed",
+            "Data source 2 needed"
+          ],
+          "ui_components": [
+            "UI component 1 (e.g., interactive map)",
+            "UI component 2 (e.g., data filters)"
+          ],
+          "research_tasks": [
+            "Research task 1 to validate data availability",
+            "Research task 2 to find current information"
+          ],
+          "success_criteria": [
+            "Criteria 1 for successful implementation",
+            "Criteria 2 for successful implementation"
+          ]
+        }}
+        """
+        
+        user_prompt = f"""
+        User Request: {self.context['user_request']}
+        
+        Analyze this request and create a detailed implementation plan. Focus on:
+        1. What exactly does the user want to accomplish?
+        2. What specific features and functionality are needed?
+        3. What data sources from our configured options should be used?
+        4. What research is needed to ensure accurate, current information?
+        5. How should the interface be designed for the best user experience?
+        
+        Be specific and actionable in your plan.
+        """
+        
+        try:
+            self.llm_calls_made += 1
+            
+            response = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.1,  # Lower temperature for more consistent planning
+                max_tokens=getattr(settings, 'AGENT_MAX_TOKENS_PLANNING', 2000)
+            )
+            
+            content = response.choices[0].message.content.strip()
+            
+            # Clean JSON from markdown if present
+            if content.startswith('```json'):
+                content = content.replace('```json', '').replace('```', '').strip()
+            elif content.startswith('```'):
+                content = content.replace('```', '').strip()
+            
+            # Parse JSON with error handling
+            try:
+                plan = json.loads(content)
+                return {
+                    "success": True,
+                    "plan": plan
+                }
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON decode error in planning step: {e}")
+                return {
+                    "success": False,
+                    "error": f"Failed to parse planning JSON: {str(e)}"
+                }
+                
+        except Exception as e:
+            logger.error(f"Planning step failed: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+    
     def _generate_final_html(self) -> Dict[str, Any]:
         """Generate the final HTML using all gathered intelligence"""
         if not self.client:
@@ -462,23 +606,40 @@ class ReactAgent:
         
         # Build comprehensive context for HTML generation
         intelligence_summary = self._build_intelligence_summary()
+        implementation_plan = self.context.get('implementation_plan', {})
+        
+        # Extract key components from the plan
+        plan_summary = implementation_plan.get('summary', 'Application based on user request')
+        functional_requirements = implementation_plan.get('functional_requirements', [])
+        ui_components = implementation_plan.get('ui_components', [])
+        success_criteria = implementation_plan.get('success_criteria', [])
         
         system_prompt = f"""
-        You are an expert disaster response application developer. You create comprehensive, data-driven web applications that integrate real external data sources for emergency management.
+        You are an expert web application developer implementing a planned application.
 
-        You have gathered intelligence through research and data validation. Use this information to create a highly accurate, functional application.
+        IMPLEMENTATION PLAN TO EXECUTE:
+        Summary: {plan_summary}
+        
+        FUNCTIONAL REQUIREMENTS TO IMPLEMENT:
+        {chr(10).join('- ' + req for req in functional_requirements) if functional_requirements else '- No specific requirements specified'}
+        
+        UI COMPONENTS TO INCLUDE:
+        {chr(10).join('- ' + comp for comp in ui_components) if ui_components else '- Components as needed for functionality'}
+        
+        SUCCESS CRITERIA:
+        {chr(10).join('- ' + crit for crit in success_criteria) if success_criteria else '- Functional application with real data'}
 
         {self.context['available_data_sources']}
 
         GATHERED INTELLIGENCE:
         {intelligence_summary}
 
-        Create a complete, functional disaster response webpage that:
-        1. Uses the ACTUAL information you've gathered through research
-        2. Integrates with verified data sources and APIs
-        3. Includes interactive elements (maps, charts, live data feeds)
-        4. Provides actionable information with specific resources and contacts
-        5. Is mobile-responsive with clear call-to-action buttons
+        Create a complete, functional webpage that IMPLEMENTS THE PLAN:
+        1. Fulfills ALL functional requirements from the implementation plan
+        2. Includes ALL specified UI components  
+        3. Uses the ACTUAL information you've gathered through research
+        4. Integrates with verified data sources and APIs
+        5. Meets the success criteria defined in the plan
 
         ⚠️ CRITICAL URL REQUIREMENTS ⚠️:
         - ONLY use EXACT API endpoints discovered through your research
