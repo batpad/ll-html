@@ -645,18 +645,58 @@ class ReactAgent:
         - ONLY use EXACT API endpoints discovered through your research
         - DO NOT modify, construct, or assume URL patterns
         - Copy URLs EXACTLY from your tool results
-        - If you need an API endpoint, it must come from your gathered intelligence
         - Add comments in JavaScript showing which research result provided each URL
-        - Include error handling for all API calls
-        - Use placeholders with clear documentation if endpoint is uncertain
+        - Include comprehensive error handling for all API calls
+        
+        ⚠️ CRITICAL GEOJSON/MAP HANDLING ⚠️:
+        - STAC GeoJSON often contains complex polygon geometries, not simple points
+        - For polygons: extract centroid or first coordinate pair for markers
+        - Always validate coordinates exist before creating markers
+        - Example coordinate extraction:
+        ```javascript
+        function getCoordinates(geometry) {{
+            if (geometry.type === 'Point') {{
+                return geometry.coordinates; // [lng, lat]
+            }} else if (geometry.type === 'Polygon') {{
+                return geometry.coordinates[0][0]; // First point of first ring
+            }}
+            return null; // Handle other types
+        }}
+        ```
 
+        ⚠️ CRITICAL TEMPLATE INJECTION UNDERSTANDING ⚠️:
+        Your generated content will be injected into this template structure:
+        
+        ```html
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <title>{{{{ title }}}}</title>
+            <link href="https://unpkg.com/leaflet/dist/leaflet.css" rel="stylesheet">
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+            <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+            <style>{{{{ custom_css }}}}</style>
+        </head>
+        <body>
+            {{{{ main_content }}}}
+            <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <script>{{{{ custom_js }}}}</script>
+        </body>
+        </html>
+        ```
+        
+        DO NOT generate <html>, <head>, or <body> tags - only the content that goes inside!
+        
         Return ONLY a valid JSON object (no markdown, no explanations) with these exact fields:
         {{
           "title": "Specific, actionable page title based on research",
           "description": "Clear description incorporating gathered intelligence", 
-          "main_content": "Complete HTML with real API calls using ONLY researched endpoints",
-          "custom_css": "Styling for interactive elements and mobile responsiveness",
-          "custom_js": "JavaScript with EXACT URLs from research, commented with source"
+          "main_content": "HTML body content ONLY (no html/head/body tags) with Bootstrap containers",
+          "custom_css": "CSS rules ONLY (no <style> tags)",
+          "custom_js": "JavaScript code ONLY (no <script> tags) with EXACT URLs from research"
         }}
         
         🚨 CRITICAL JSON FORMATTING:
