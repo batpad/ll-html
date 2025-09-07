@@ -424,15 +424,29 @@ class ReactAgent:
             }
         
         try:
-            # Validate parameters format
+            # Validate and fix parameters format
             if not isinstance(parameters, dict):
-                logger.error(f"Tool {tool_name} received non-dict parameters: {type(parameters)} - {parameters}")
-                return {
-                    "success": False,
-                    "error": f"Invalid parameters format: expected dict, got {type(parameters).__name__}",
-                    "tool": tool_name,
-                    "raw_parameters": str(parameters)
-                }
+                logger.warning(f"Tool {tool_name} received non-dict parameters: {type(parameters)} - {parameters}")
+                # Try to fix common parameter issues
+                if isinstance(parameters, str):
+                    # For web_search, if it's just a query string, wrap it properly
+                    if tool_name == "web_search":
+                        parameters = {"query": parameters}
+                    else:
+                        # For other tools, return error
+                        return {
+                            "success": False,
+                            "error": f"Invalid parameters format: expected dict, got string",
+                            "tool": tool_name,
+                            "raw_parameters": str(parameters)
+                        }
+                else:
+                    return {
+                        "success": False,
+                        "error": f"Invalid parameters format: expected dict, got {type(parameters).__name__}",
+                        "tool": tool_name,
+                        "raw_parameters": str(parameters)
+                    }
             
             result = tool.execute(**parameters)
             self._log_message("tool", f"Executed {tool_name}", {"parameters": parameters, "result": result})
