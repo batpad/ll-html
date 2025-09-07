@@ -725,8 +725,12 @@ class ReactAgent:
 
         🚨 LIBRARY USAGE EXAMPLES (all libraries are PRE-LOADED):
         ```javascript
-        // MAPS (Leaflet is ready):
+        // MAPS (Leaflet is ready - MUST add OSM basemap):
         const map = L.map('mapId').setView([lat, lng], zoom);
+        // REQUIRED: Add OpenStreetMap basemap to every map:
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
         L.marker([lat, lng]).addTo(map).bindPopup('Info');
         
         // CHARTS (Chart.js is ready):
