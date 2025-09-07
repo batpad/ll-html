@@ -1,0 +1,28 @@
+[Unit]
+Description=ll-html Django application
+After=network.target
+
+[Service]
+Type=exec
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/ll-html
+Environment=PATH=/opt/ll-html/venv/bin
+ExecStart=/opt/ll-html/venv/bin/gunicorn --config /opt/ll-html/deploy/gunicorn.conf.py ll_html.wsgi:application
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=5
+PrivateTmp=true
+Restart=on-failure
+RestartSec=3
+
+# Create necessary directories
+RuntimeDirectory=ll-html
+RuntimeDirectoryMode=0755
+
+# Log directories
+LogsDirectory=ll-html
+LogsDirectoryMode=0755
+
+[Install]
+WantedBy=multi-user.target
