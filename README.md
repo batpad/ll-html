@@ -48,19 +48,31 @@ pip install -r requirements.txt
 
 # Configure environment
 cp .env.example .env
-# Add OpenAI API key to .env
+# Add OpenAI API key and GitHub OAuth credentials to .env
 
 # Initialize
 python manage.py migrate
+python manage.py createsuperuser
 python manage.py create_base_templates
 python manage.py runserver
 ```
 
+### Authentication Setup
+This application requires GitHub OAuth authentication:
+1. Create GitHub OAuth app at [GitHub Developer Settings](https://github.com/settings/developers)
+2. Set callback URL: `http://localhost:8000/accounts/github/login/callback/`
+3. Add your GitHub Client ID/Secret to `.env`
+4. Set up whitelists at `/admin/` (Whitelisted GitHub Organizations or Usernames)
+
+See [AUTHENTICATION.md](AUTHENTICATION.md) for detailed setup instructions.
+
 ### Usage
-1. Go to http://localhost:8000/generator/demo/
-2. Enter request: "Create earthquake monitoring dashboard"
-3. Wait for generation (30-60 seconds)
-4. View generated application
+1. Go to http://localhost:8000/ (you'll be redirected to GitHub login)
+2. Sign in with GitHub (must be whitelisted)
+3. Go to the generator at http://localhost:8000/generator/demo/
+4. Enter request: "Create earthquake monitoring dashboard"
+5. Wait for generation (30-60 seconds)
+6. View generated application
 
 ## Data Sources
 

@@ -16,8 +16,15 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.shortcuts import redirect
+
+def home_redirect(request):
+    """Redirect root URL to generator demo"""
+    return redirect('generator:demo_form')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('accounts/', include('allauth.urls')),
     path('generator/', include('generator.urls')),
+    path('', home_redirect, name='home'),
 ]

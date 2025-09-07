@@ -38,7 +38,13 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.sites',
     'rest_framework',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.github',
+    'authentication',
     'agents',
     'datasets',
     'generator',
@@ -53,6 +59,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
+    'authentication.middleware.WhitelistMiddleware',
 ]
 
 ROOT_URLCONF = 'll_html.urls'
@@ -60,7 +68,7 @@ ROOT_URLCONF = 'll_html.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -158,3 +166,33 @@ AGENT_ENABLE_API_VALIDATION = config('AGENT_ENABLE_API_VALIDATION', default=True
 # LLM Token Configuration
 AGENT_MAX_TOKENS_FINAL_GENERATION = config('AGENT_MAX_TOKENS_FINAL_GENERATION', default=6000, cast=int)  # Increased from 4000
 AGENT_MAX_TOKENS_REASONING = config('AGENT_MAX_TOKENS_REASONING', default=2000, cast=int)               # For reasoning steps
+
+# Django Allauth Configuration
+AUTHENTICATION_BACKENDS = (
+    'allauth.account.auth_backends.AuthenticationBackend',
+    'django.contrib.auth.backends.ModelBackend',
+)
+
+SITE_ID = 1
+
+# Allauth settings
+ACCOUNT_LOGIN_METHODS = {'email'}
+ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
+ACCOUNT_EMAIL_VERIFICATION = 'optional'
+ACCOUNT_UNIQUE_EMAIL = True
+LOGIN_REDIRECT_URL = '/'
+ACCOUNT_LOGOUT_REDIRECT_URL = '/accounts/login/'
+
+# Social account providers
+SOCIALACCOUNT_PROVIDERS = {
+    'github': {
+        'SCOPE': [
+            'user:email',
+            'read:org',
+        ],
+        'APP': {
+            'client_id': config('GITHUB_CLIENT_ID', default=''),
+            'secret': config('GITHUB_CLIENT_SECRET', default=''),
+        }
+    }
+}
