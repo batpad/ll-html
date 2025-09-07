@@ -744,7 +744,7 @@ class ReactAgent:
         // REQUIRED: Add OpenStreetMap basemap to every map:
         L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
             attribution: '© OpenStreetMap contributors'
-        }).addTo(map);
+        }}).addTo(map);
         L.marker([lat, lng]).addTo(map).bindPopup('Info');
         
         // CHARTS (Chart.js is ready):
